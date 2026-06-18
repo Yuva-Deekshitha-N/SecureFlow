@@ -35,7 +35,7 @@ ${file.patch}
 Respond ONLY in strictly valid JSON containing an array of findings. If no vulnerabilities exist, return an empty array [].
 Format:
 [{
-  "type": "Data Leak | Vulnerability | Misconfig",
+  "type": "Secret | Vulnerability | Misconfig",
   "severity": "CRITICAL | HIGH | MEDIUM | LOW",
   "description": "Detailed explanation.",
   "fileLocation": "${file.filename}",

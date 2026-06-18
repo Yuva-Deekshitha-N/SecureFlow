@@ -7,9 +7,8 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-// Swapped User for Shield
-import { Search, Filter, Download, Shield, Activity, Database } from "lucide-react"; 
+import { Card, CardContent } from "@/components/ui/card";
+import { Shield, Activity, Database } from "lucide-react"; 
 import prisma from "@/lib/prisma";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
@@ -30,7 +29,14 @@ export default async function AuditPage() {
     take: 100, 
   });
   
-  // REPLACED global user count with user-specific active repositories count
+  // FIX: Fetch User details to map User IDs to User Names/Emails
+  const uniqueUserIds = [...new Set(logs.map(l => l.userId).filter((id): id is string => id !== null))];
+  const users = await prisma.user.findMany({
+    where: { id: { in: uniqueUserIds } },
+    select: { id: true, name: true, email: true }
+  });
+  const userMap = new Map(users.map(u => [u.id, u.name || u.email || 'Unknown User']));
+  
   const activeReposCount = await prisma.repository.count({
     where: { 
       userId,
@@ -57,8 +63,7 @@ export default async function AuditPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* REPLACED the Active Admins card with Monitored Repositories */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white/5 rounded-xl border border-white/10 p-4 flex items-center gap-4">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
             <Shield className="w-5 h-5" />
@@ -78,16 +83,6 @@ export default async function AuditPage() {
             <div className="text-lg font-bold">{actions24hCount.toLocaleString()}</div>
           </div>
         </div>
-        
-        <div className="bg-white/5 rounded-xl border border-white/10 p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400">
-            <Database className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Data Retention</div>
-            <div className="text-lg font-bold">90 Days</div>
-          </div>
-        </div>
       </div>
 
       <Card className="glass-card">
@@ -104,7 +99,8 @@ export default async function AuditPage() {
             </TableHeader>
             <TableBody>
               {logs.map((log) => {
-                const displayUser = log.userId || "System";
+                // FIX: Retrieve user name from Map instead of rendering ID
+                const displayUser = log.userId ? (userMap.get(log.userId) || log.userId) : "System";
                 return (
                   <TableRow key={log.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <TableCell className="py-4">
@@ -112,9 +108,6 @@ export default async function AuditPage() {
                     </TableCell>
                     <TableCell className="py-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-bold">
-                          {displayUser[0].toUpperCase()}
-                        </div>
                         <span className="text-xs font-medium">{displayUser}</span>
                       </div>
                     </TableCell>
