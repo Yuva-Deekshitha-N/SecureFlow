@@ -27,9 +27,6 @@ export async function POST(req: NextRequest) {
         where: { provider: 'github', providerAccountId: senderId },
       });
 
-      // If the account exists, process it in the background.
-      // If it doesn't, return 200 OK anyway. The Setup URL page will handle the database entry 
-      // once the user is forced to log in.
       if (!account) {
         console.log(`Webhook received installation for unknown user ${senderId}. Awaiting Setup URL redirect linking.`);
         return NextResponse.json({ success: true, message: 'Awaiting user login via setup URL' });
@@ -38,19 +35,31 @@ export async function POST(req: NextRequest) {
       // Add all selected repositories to the database
       const repoPromises = repositories.map((repo: any) => {
         return prisma.repository.upsert({
-          where: { githubId: repo.id },
+          where: { githubId: BigInt(repo.id) },
           update: { isActive: true },
           create: {
-            githubId: repo.id,
+            githubId: BigInt(repo.id),
             fullName: repo.full_name,
             owner: repo.full_name.split('/')[0],
-            userId: account.userId, // Link to the NextAuth user
+            userId: account.userId, 
           }
         });
       });
 
       await Promise.all(repoPromises);
       console.log(`Successfully installed app and populated ${repositories.length} repositories.`);
+      console.log(process.env.GROQ_API_KEY)
+      // --- EVENT 1: Repository Added (Installation) ---
+      await prisma.auditLog.create({
+        data: {
+          userId: account.userId,
+          action: 'Repository Added',
+          resource: repositories.map((r: any) => r.full_name).join(', '),
+          metadata: { count: repositories.length, event: 'installation' }
+        }
+      });
+      // ------------------------------------------------
+
       return NextResponse.json({ success: true, message: 'Repositories populated' });
     }
 
@@ -66,10 +75,10 @@ export async function POST(req: NextRequest) {
       if (account) {
         const repoPromises = repositories_added.map((repo: any) => {
           return prisma.repository.upsert({
-            where: { githubId: repo.id },
+            where: { githubId: BigInt(repo.id) },
             update: { isActive: true },
             create: {
-              githubId: repo.id,
+              githubId: BigInt(repo.id),
               fullName: repo.full_name,
               owner: repo.full_name.split('/')[0],
               userId: account.userId,
@@ -77,6 +86,17 @@ export async function POST(req: NextRequest) {
           });
         });
         await Promise.all(repoPromises);
+
+        // --- EVENT 1: Repository Added (Post-Installation) ---
+        await prisma.auditLog.create({
+          data: {
+            userId: account.userId,
+            action: 'Repository Added',
+            resource: repositories_added.map((r: any) => r.full_name).join(', '),
+            metadata: { count: repositories_added.length, event: 'installation_repositories' }
+          }
+        });
+        // -----------------------------------------------------
       }
       return NextResponse.json({ success: true, message: 'New repositories added' });
     }
@@ -90,6 +110,23 @@ export async function POST(req: NextRequest) {
       }
 
       console.log(`Processing PR #${pull_request.number} on ${repository.full_name}`);
+
+      // Fetch the repo early to associate the correct userId with the incoming PR audit logs
+      const dbRepo = await prisma.repository.findUnique({
+        where: { githubId: BigInt(repository.id) }
+      });
+      const userId = dbRepo?.userId;
+
+      // --- EVENT 2: Scan Triggered ---
+      await prisma.auditLog.create({
+        data: {
+          userId: userId,
+          action: 'Scan Triggered',
+          resource: `${repository.full_name}#${pull_request.number}`,
+          metadata: { action: action, head_sha: pull_request.head.sha }
+        }
+      });
+      // -------------------------------
 
       const appId = process.env.GITHUB_APP_ID!;
       const privateKey = process.env.GITHUB_PRIVATE_KEY!.replace(/\\n/g, '\n'); 
@@ -125,6 +162,18 @@ export async function POST(req: NextRequest) {
       const decision = iq.evaluateFindings(findings);
       const conclusion = decision === 'PASS' ? 'success' : (decision === 'REVIEW REQUIRED' ? 'action_required' : 'failure');
       
+      // --- EVENT 3: Policy Evaluation ---
+      await prisma.auditLog.create({
+        data: {
+          userId: userId,
+          action: 'Policy Evaluation',
+          resource: `${repository.full_name}#${pull_request.number}`,
+          decision: decision,
+          metadata: { findingsCount: findings.length }
+        }
+      });
+      // ----------------------------------
+
       await octokit.rest.checks.create({
         owner: repository.owner.login,
         repo: repository.name,
@@ -152,13 +201,20 @@ export async function POST(req: NextRequest) {
           issue_number: pull_request.number,
           body: commentBody,
         });
+
+        // --- EVENT 4: PR Comment Posted ---
+        await prisma.auditLog.create({
+          data: {
+            userId: userId,
+            action: 'PR Comment Posted',
+            resource: `${repository.full_name}#${pull_request.number}`,
+            metadata: { commentType: 'AI Security Report', findingsReported: enrichedFindings.length }
+          }
+        });
+        // ----------------------------------
       }
 
-      // Persist to DB
-      const dbRepo = await prisma.repository.findUnique({
-        where: { githubId: repository.id }
-      });
-
+      // Persist PR details to DB
       if (dbRepo) {
         const dbPr = await prisma.pullRequest.upsert({
           where: { githubId: BigInt(pull_request.id) },
