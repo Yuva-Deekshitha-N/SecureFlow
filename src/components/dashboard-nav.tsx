@@ -17,8 +17,6 @@ import {
 
 const NAV_ITEMS = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Repositories', href: '/dashboard/repos', icon: Package },
-  { name: 'Pull Requests', href: '/dashboard/prs', icon: GitPullRequest },
   { name: 'Findings', href: '/dashboard/findings', icon: ShieldAlert },
   { name: 'Policies', href: '/dashboard/policies', icon: Lock },
   { name: 'Audit Logs', href: '/dashboard/audit', icon: History },

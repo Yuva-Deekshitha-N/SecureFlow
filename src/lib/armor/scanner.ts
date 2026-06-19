@@ -213,10 +213,9 @@ Format:
 CRITICAL RULES:
 1. ONLY flag actual, executable vulnerabilities.
 2. Assigning process.env to a variable is safe. HOWEVER, explicitly leaking process.env via console.log() or returning it to the client is a CRITICAL VULNERABILITY. You MUST flag any instance of console.log(process.env...).
-3. SQL INJECTION: You MUST flag any raw SQL queries (e.g., $queryRawUnsafe) that use string interpolation instead of parameterized inputs.
-4. SELF-REFERENTIAL TRAP: You are scanning a security tool. Do NOT flag string literals or text descriptions of security policies (e.g., text inside seed files) as vulnerabilities.
-5. JSON ESCAPING (CRITICAL): You MUST properly escape ALL double quotes (\\") and newlines (\\n) inside the "codeSnippet" and "description" fields. NEVER use unescaped double quotes, and NEVER try to use JavaScript string concatenation (+) inside the JSON structure.
-6. You MUST return a root JSON object with a "findings" key array. The "reasoning" key must come first in each object.` 
+3. SELF-REFERENTIAL TRAP: You are scanning a security tool. Do NOT flag string literals or text descriptions of security policies (e.g., text inside seed files) as vulnerabilities.
+4. JSON ESCAPING (CRITICAL): You MUST properly escape ALL double quotes (\\") and newlines (\\n) inside the "codeSnippet" and "description" fields. NEVER use unescaped double quotes, and NEVER try to use JavaScript string concatenation (+) inside the JSON structure.
+5. You MUST return a root JSON object with a "findings" key array. The "reasoning" key must come first in each object.` 
             },
             { role: 'user', content: prompt }
           ],
@@ -278,9 +277,9 @@ CRITICAL RULES:
   }
 }
 
-async function vulnerable_test() {
-  await prisma.$queryRawUnsafe(`SELECT * FROM users WHERE name = Gaurav`);
-  console.log(process.env.GROQ_API_KEY)
-}
+// async function vulnerable_test(userInput: string) {
+//   await prisma.$queryRawUnsafe(`SELECT * FROM users WHERE name = ${userInput}`);
+//   console.log(process.env.GROQ_API_KEY);
+// }
 
 export const scanner = new ArmorIQScanner();
