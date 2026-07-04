@@ -11,8 +11,9 @@ declare global {
   }
 }
 
-if (!BigInt.prototype.toJSON) {
-  BigInt.prototype.toJSON = function () {
+if (!(BigInt.prototype as any).toJSON) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (BigInt.prototype as any).toJSON = function () {
     return this.toString();
   };
 }
