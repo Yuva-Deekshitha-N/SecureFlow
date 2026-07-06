@@ -51,6 +51,10 @@ async function verifyGitHubWebhook(req: NextRequest): Promise<any> {
 }
 
 export async function POST(req: NextRequest) {
+  let octokitInstance: any = null;
+  let checkRunId: number | null = null;
+  let repoOwner: string = '';
+  let repoName: string = '';
 
   try {
     const rawPayload = await verifyGitHubWebhook(req);
@@ -267,6 +271,20 @@ export async function POST(req: NextRequest) {
         })
       });
       const octokit = await appClient.getInstallationOctokit(Number(installation?.id || 0));
+      octokitInstance = octokit;
+      repoOwner = repository?.owner?.login ?? '';
+      repoName = repository?.name ?? '';
+
+      // Create initial "in_progress" check run
+      const checkRun = await octokit.rest.checks.create({
+        owner: repoOwner,
+        repo: repoName,
+        name: 'SecureFlow Scan',
+        head_sha: pull_request?.head?.sha ?? '',
+        status: 'in_progress',
+        started_at: new Date().toISOString(),
+      });
+      checkRunId = checkRun.data.id;
 
       let pullRequestFiles;
       try {
@@ -283,13 +301,13 @@ export async function POST(req: NextRequest) {
         if (error.status === 403 || error.status === 429 || (error.message && error.message.toLowerCase().includes('rate limit'))) {
           console.error('GitHub API rate limit exceeded while fetching PR files:', error);
           
-          await octokit.rest.checks.create({
-            owner: repository?.owner?.login ?? '',
-            repo: repository?.name ?? '',
-            name: 'SecureFlow Scan',
-            head_sha: pull_request?.head?.sha ?? '',
+          await octokit.rest.checks.update({
+            owner: repoOwner,
+            repo: repoName,
+            check_run_id: checkRunId!,
             status: 'completed',
             conclusion: 'failure',
+            completed_at: new Date().toISOString(),
             output: {
               title: `Scan Failed: API Rate Limit`,
               summary: `Scan failed due to GitHub API rate limits. Please try again later.`,
@@ -337,14 +355,14 @@ export async function POST(req: NextRequest) {
           body: `### 🛡️ SecureFlow AI Security Report\n\n❌ **Scan Failed: Analysis Engine Unavailable**\n\nThe security scan failed because the AI analysis engine is currently unavailable (rate limits or repeated API errors). Please trigger the scan again by pushing a new commit or reopening this Pull Request.`,
         });
 
-        // Create a failed check run
-        await octokit.rest.checks.create({
-          owner: repository?.owner?.login ?? '',
-          repo: repository?.name ?? '',
-          name: 'SecureFlow Scan',
-          head_sha: pull_request?.head?.sha ?? '',
+        // Update the in-progress check run to failure
+        await octokit.rest.checks.update({
+          owner: repoOwner,
+          repo: repoName,
+          check_run_id: checkRunId!,
           status: 'completed',
           conclusion: 'failure',
+          completed_at: new Date().toISOString(),
           output: {
             title: 'Scan Failed: Analysis Engine Unavailable',
             summary: `SecureFlow AI scan failed because the analysis engine is currently unavailable. Error details: ${scanError.message || String(scanError)}`,
@@ -395,13 +413,13 @@ export async function POST(req: NextRequest) {
       });
       // ----------------------------------
 
-      await octokit.rest.checks.create({
-        owner: repository?.owner?.login ?? '',
-        repo: repository?.name ?? '',
-        name: 'SecureFlow Scan',
-        head_sha: pull_request?.head?.sha ?? '',
+      await octokit.rest.checks.update({
+        owner: repoOwner,
+        repo: repoName,
+        check_run_id: checkRunId!,
         status: 'completed',
         conclusion: conclusion,
+        completed_at: new Date().toISOString(),
         output: {
           title: `Policy Decision: ${decision}`,
           summary: `SecureFlow detected ${findings.length} potential security issues.`,
@@ -500,8 +518,28 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ message: 'Event successfully caught but ignored' }, { status: 200 });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Webhook Error:', error);
+
+    if (octokitInstance && checkRunId && repoOwner && repoName) {
+      try {
+        await octokitInstance.rest.checks.update({
+          owner: repoOwner,
+          repo: repoName,
+          check_run_id: checkRunId,
+          status: 'completed',
+          conclusion: 'failure',
+          completed_at: new Date().toISOString(),
+          output: {
+            title: 'Scan Failed: Webhook Exception',
+            summary: `SecureFlow encountered an unexpected error during execution. Error details: ${error.message || String(error)}`,
+          }
+        });
+      } catch (checkUpdateError) {
+        console.error('Failed to update GitHub check run on exception:', checkUpdateError);
+      }
+    }
+
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
