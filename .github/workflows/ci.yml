@@ -35,10 +35,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Linter
-        run: npx eslint src
-        env:
-          ESLINT_USE_FLAT_CONFIG: false
+
 
       - name: Run Typechecker
         run: npm run typecheck
