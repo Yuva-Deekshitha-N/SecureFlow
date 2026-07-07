@@ -1,8 +1,9 @@
 import { signIn } from "@/auth";
 import { Button } from "@/components/ui/button";
-import { Github, Shield } from "lucide-react";
+import { GitBranch, Shield } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default async function LoginPage({
   searchParams,
@@ -14,6 +15,9 @@ export default async function LoginPage({
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden px-4">
+      <div className="absolute top-6 right-6 z-20">
+        <ThemeToggle />
+      </div>
       {/* Background Gradients to match landing page */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-[600px] bg-[radial-gradient(circle_at_center,rgba(146,123,255,0.15)_0%,transparent_60%)] pointer-events-none" />
 
@@ -47,7 +51,7 @@ export default async function LoginPage({
             size="lg" 
             className="w-full bg-primary text-background hover:bg-primary/90 glow-primary font-semibold h-12 text-md"
           >
-            <Github className="w-5 h-5 mr-2" />
+            <GitBranch className="w-5 h-5 mr-2" />
             Continue with GitHub
           </Button>
         </form>
