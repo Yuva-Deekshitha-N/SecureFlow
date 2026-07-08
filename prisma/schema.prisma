@@ -78,6 +78,7 @@ model Repository {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   pullRequests PullRequest[]
+  webhookEvents WebhookEvent[]
   createdAt    DateTime      @default(now())
 
   @@index([userId])
@@ -123,6 +124,7 @@ model PullRequest {
   repositoryId String
   repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   scans        ScanResult[]
+  webhookEvents WebhookEvent[]
   createdAt    DateTime     @default(now())
 
   @@index([repositoryId])
@@ -170,7 +172,14 @@ model AuditLog {
 }
 
 model WebhookEvent {
-  id         String   @id @default(cuid())
-  deliveryId String   @unique
-  createdAt  DateTime @default(now())
+  id            String       @id @default(cuid())
+  deliveryId    String       @unique
+  repositoryId  String?
+  repository    Repository?  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  pullRequestId String?
+  pullRequest   PullRequest? @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+
+  @@index([repositoryId])
+  @@index([pullRequestId])
 }

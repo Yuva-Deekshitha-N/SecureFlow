@@ -59,20 +59,6 @@ export async function POST(req: NextRequest) {
   try {
     const rawPayload = await verifyGitHubWebhook(req);
 
-    const deliveryId = req.headers.get('x-github-delivery');
-    if (deliveryId) {
-      const existingEvent = await prisma.webhookEvent.findUnique({
-        where: { deliveryId }
-      });
-      if (existingEvent) {
-        console.log(`♻️ Skipping duplicate webhook delivery: ${deliveryId}`);
-        return NextResponse.json({ message: "Webhook already processed" }, { status: 202 });
-      }
-      await prisma.webhookEvent.create({
-        data: { deliveryId }
-      });
-    }
-    
     // Strict input validation schema
     const repoSchema = z.object({
       id: z.union([z.number(), z.string()]),
@@ -111,6 +97,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload structure' }, { status: 400 });
     }
     const payload = parsed.data;
+
+    const deliveryId = req.headers.get('x-github-delivery');
+    if (deliveryId) {
+      const existingEvent = await prisma.webhookEvent.findUnique({
+        where: { deliveryId }
+      });
+      if (existingEvent) {
+        return NextResponse.json({ message: "Webhook already processed" }, { status: 202 });
+      }
+
+      // Try to link existing Repository and PullRequest
+      const repoGithubId = payload.repository?.id;
+      const prGithubId = payload.pull_request?.id;
+      let dbRepoId: string | undefined;
+      let dbPrId: string | undefined;
+
+      if (repoGithubId) {
+        const dbRepo = await prisma.repository.findUnique({
+          where: { githubId: BigInt(repoGithubId) }
+        });
+        if (dbRepo) {
+          dbRepoId = dbRepo.id;
+        }
+      }
+
+      if (prGithubId) {
+        const dbPr = await prisma.pullRequest.findUnique({
+          where: { githubId: BigInt(prGithubId) }
+        });
+        if (dbPr) {
+          dbPrId = dbPr.id;
+        }
+      }
+
+      await prisma.webhookEvent.create({
+        data: {
+          deliveryId,
+          repositoryId: dbRepoId,
+          pullRequestId: dbPrId,
+        }
+      });
+    }
 
     const event = req.headers.get('x-github-event');
 
@@ -516,6 +544,17 @@ export async function POST(req: NextRequest) {
             repositoryId: dbRepo.id
           }
         });
+
+        // Update WebhookEvent to link it to the newly created/upserted PullRequest
+        if (deliveryId) {
+          await prisma.webhookEvent.update({
+            where: { deliveryId },
+            data: {
+              repositoryId: dbRepo.id,
+              pullRequestId: dbPr.id,
+            }
+          });
+        }
 
         const severityScores: Record<string, number> = { CRITICAL: 10, HIGH: 5, MEDIUM: 3, LOW: 1 };
         const riskScore = findings.reduce((score: number, f: any) => score + (severityScores[f.severity.toUpperCase()] || 0), 0);
