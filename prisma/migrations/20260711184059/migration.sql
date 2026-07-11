@@ -1,6 +1,6 @@
 -- AlterTable
-ALTER TABLE "PullRequest" ADD COLUMN     "authorLogin" TEXT,
-ADD COLUMN     "authorAvatarUrl" TEXT;
+ALTER TABLE "PullRequest" ADD COLUMN     "authorAvatarUrl" TEXT,
+ADD COLUMN     "authorLogin" TEXT;
 
 -- CreateIndex
 CREATE INDEX "PullRequest_authorLogin_idx" ON "PullRequest"("authorLogin");
