@@ -8,6 +8,10 @@ declare module "next-auth" {
       codename?: string | null
       roles?: string[]
     } & DefaultSession["user"]
+    /** GitHub OAuth access token, refreshed on read. Server-side use only. */
+    accessToken?: string | null
+    /** Set to "RefreshAccessTokenError" when the token refresh failed. */
+    error?: string | null
   }
   interface User {
     codename?: string | null
@@ -21,5 +25,16 @@ declare module "next-auth/jwt" {
     codename?: string | null
     roles?: string[]
     error?: string
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    accessToken?: string | null
+    refreshToken?: string | null
+    accessTokenExpires?: number
+    userId?: string
+    codename?: string | null
+    error?: string | null
   }
 }

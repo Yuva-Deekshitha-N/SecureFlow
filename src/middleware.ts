@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { ratelimit } from "@/lib/ratelimit";
 
-export default auth((req) => {
+export default auth(async (req) => {
   const { nextUrl } = req;
   const token = req.auth;
+
+  // Rate Limiting Logic for /api/og
+  if (nextUrl.pathname.startsWith('/api/og') && ratelimit) {
+    const ip = req.headers.get('x-forwarded-for') ?? '127.0.0.1';
+    const { success } = await ratelimit.limit(ip);
+    
+    if (!success) {
+      return new NextResponse('Too Many Requests', { status: 429 });
+    }
+  }
   
+  // RBAC Admin Route Guarding
   if (nextUrl.pathname.startsWith('/admin')) {
     const roles = (token?.user?.roles as string[]) || [];
     if (!token || !roles.includes("ADMIN")) {
