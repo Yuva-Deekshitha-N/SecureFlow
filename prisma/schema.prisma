@@ -9,6 +9,7 @@ datasource db {
 model User {
   id            String    @id @default(cuid())
   name          String?
+  codename      String?   @unique
   email         String?   @unique
   emailVerified DateTime?
   image         String?
@@ -42,6 +43,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -52,6 +54,8 @@ model Session {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -74,7 +78,10 @@ model Repository {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   pullRequests PullRequest[]
+  webhookEvents WebhookEvent[]
   createdAt    DateTime      @default(now())
+
+  @@index([userId])
 }
 
 model PolicyTemplate {
@@ -103,19 +110,27 @@ model UserPolicyToggle {
 
   // Ensure a user can only have one toggle record per template
   @@unique([userId, policyTemplateId])
+  @@index([userId])
+  @@index([policyTemplateId])
 }
 
 model PullRequest {
-  id           String       @id @default(cuid())
-  githubId     BigInt       @unique // Changed from Int
-  prNumber     Int // Int is fine here since PR numbers are sequential per repo
-  title        String
-  state        String // open, closed, merged
-  status       String // PASS, REVIEW_REQUIRED, BLOCKED
-  repositoryId String
-  repository   Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  scans        ScanResult[]
-  createdAt    DateTime     @default(now())
+  id              String       @id @default(cuid())
+  githubId        BigInt       @unique // Changed from Int
+  prNumber        Int // Int is fine here since PR numbers are sequential per repo
+  title           String
+  state           String // open, closed, merged
+  status          String // PASS, REVIEW_REQUIRED, BLOCKED
+  authorLogin     String?   // GitHub login of the PR author (from webhook)
+  authorAvatarUrl String?   // GitHub avatar URL (from webhook)
+  repositoryId    String
+  repository      Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  scans           ScanResult[]
+  webhookEvents   WebhookEvent[]
+  createdAt       DateTime     @default(now())
+
+  @@index([repositoryId])
+  @@index([authorLogin])
 }
 
 model ScanResult {
@@ -126,6 +141,9 @@ model ScanResult {
   riskScore      Int
   policyDecision String // PASS, REVIEW, BLOCK
   createdAt      DateTime    @default(now())
+
+  @@index([pullRequestId])
+  @@index([pullRequestId, createdAt(sort: Desc)])
 }
 
 model Finding {
@@ -138,7 +156,10 @@ model Finding {
   codeSnippet  String?
   explanation  String?
   remediation  String?
+  promptInjectionSuspected Boolean @default(false)
   createdAt    DateTime   @default(now())
+
+  @@index([scanResultId])
 }
 
 model AuditLog {
@@ -149,4 +170,20 @@ model AuditLog {
   decision  String?
   metadata  Json?
   timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, timestamp(sort: Desc)])
+}
+
+model WebhookEvent {
+  id            String       @id @default(cuid())
+  deliveryId    String       @unique
+  repositoryId  String?
+  repository    Repository?  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  pullRequestId String?
+  pullRequest   PullRequest? @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+
+  @@index([repositoryId])
+  @@index([pullRequestId])
 }
