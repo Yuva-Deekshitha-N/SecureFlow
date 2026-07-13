@@ -45,7 +45,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             Admin Panel
           </p>
           {ADMIN_NAV_ITEMS.map((item) => (
-            <AdminNavLink key={item.href} href={item.href} icon={item.icon}>
+            <AdminNavLink
+              key={item.href}
+              href={item.href}
+              icon={<item.icon className="w-4 h-4 shrink-0" />}
+            >
               {item.name}
             </AdminNavLink>
           ))}
