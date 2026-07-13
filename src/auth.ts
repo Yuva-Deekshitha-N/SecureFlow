@@ -20,19 +20,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: {
     strategy: "jwt",
-    maxAge: 15 * 60, // 15 minutes short-lived access token
+    maxAge: 15 * 60, // 15 minutes — confirm this is the intended session length (see note below)
   },
   providers: [
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
-        },
-      },
     }),
   ],
   pages: {
@@ -45,47 +38,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return {
           ...token,
           accessToken: account.access_token,
-          refreshToken: account.refresh_token,
-          accessTokenExpires: account.expires_at ? account.expires_at * 1000 : 0,
           userId: user.id,
           codename: user.codename,
         };
       }
-
-      // Return previous token if the access token has not expired yet
-      const accessTokenExpires = token.accessTokenExpires as number;
-      if (!accessTokenExpires || Date.now() < accessTokenExpires) {
-        return token;
-      }
-
-      // Access token has expired, try to update it
-      try {
-        const response = await fetch("https://github.com/login/oauth/access_token", {
-          headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-          body: new URLSearchParams({
-            client_id: process.env.GITHUB_CLIENT_ID!,
-            client_secret: process.env.GITHUB_CLIENT_SECRET!,
-            grant_type: "refresh_token",
-            refresh_token: token.refreshToken as string,
-          }),
-          method: "POST",
-        });
-
-        const refreshedTokens = await response.json();
-
-        if (!response.ok) {
-          throw refreshedTokens;
-        }
-
-        return {
-          ...token,
-          accessToken: refreshedTokens.access_token,
-          accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
-          refreshToken: refreshedTokens.refresh_token ?? token.refreshToken, // Fall back to old refresh token
-        };
-      } catch (error) {
-        return { ...token, error: "RefreshAccessTokenError" };
-      }
+      return token;
     },
     async session({ session, token }: any) {
       if (session?.user) {
@@ -94,10 +51,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return {
         ...session,
-        // Surface the (refreshed-on-read) GitHub token so server components can
-        // call the GitHub API on the user's behalf. Read server-side only.
+        // GitHub OAuth App tokens don't expire, so this is just the
+        // original access token — safe for server components to use
+        // to call the GitHub API on the user's behalf. Read server-side only.
         accessToken: token.accessToken,
-        error: token.error,
       };
     },
   },
