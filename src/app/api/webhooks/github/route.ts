@@ -578,24 +578,35 @@ const handler = withErrorHandler(async function POST(req: NextRequest) {
         const severityScores: Record<string, number> = { CRITICAL: 10, HIGH: 5, MEDIUM: 3, LOW: 1 };
         const riskScore = findings.reduce((score: number, f: any) => score + (severityScores[f.severity.toUpperCase()] || 0), 0);
 
-        await prisma.scanResult.create({
-          data: {
-            pullRequestId: dbPr.id,
-            riskScore,
-            policyDecision: decision,
-            findings: {
-              create: enrichedFindings.map((f: any) => ({
-                type: f.type,
-                severity: f.severity,
-                fileLocation: f.fileLocation,
-                codeSnippet: f.codeSnippet || null,
-                explanation: f.explanation || null,
-                remediation: f.remediation || null,
-                promptInjectionSuspected: f.promptInjectionSuspected || false
-              }))
+        // "Latest wins": a PR is re-scanned on every push (opened / synchronize /
+        // reopened), and each run used to `create` an additional ScanResult, so a PR
+        // pushed N times accumulated N scans and N copies of every finding - inflating
+        // totalScans, the severity count tiles and getRiskTrend's avg(riskScore).
+        // Delete any prior scan(s) for this PR before writing the new one so exactly one
+        // current ScanResult exists per PR. Both statements run in a single transaction
+        // so the old scan is only dropped once the new one is committed. Finding rows are
+        // removed by the onDelete: Cascade on Finding -> ScanResult (see prisma/schema.prisma).
+        await prisma.$transaction([
+          prisma.scanResult.deleteMany({ where: { pullRequestId: dbPr.id } }),
+          prisma.scanResult.create({
+            data: {
+              pullRequestId: dbPr.id,
+              riskScore,
+              policyDecision: decision,
+              findings: {
+                create: enrichedFindings.map((f: any) => ({
+                  type: f.type,
+                  severity: f.severity,
+                  fileLocation: f.fileLocation,
+                  codeSnippet: f.codeSnippet || null,
+                  explanation: f.explanation || null,
+                  remediation: f.remediation || null,
+                  promptInjectionSuspected: f.promptInjectionSuspected || false
+                }))
+              }
             }
-          }
-        });
+          }),
+        ]);
       }
 
       return NextResponse.json({ success: true, decision, findingCount: findings.length });
