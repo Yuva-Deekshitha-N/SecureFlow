@@ -5,8 +5,6 @@ import { CyberRainBackground } from "./cyber-rain-background";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CyberTextReveal } from "@/components/cyber-text-reveal";
-import { cn } from "@/lib/utils";
 
 /**
  * HeistTransmission
