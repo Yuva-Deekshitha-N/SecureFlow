@@ -116,6 +116,7 @@ export function HeistTransmission({
   const [reducedMotion, setReducedMotion] = useState(false);
   useEffect(() => {
     const mql = window.matchMedia(REDUCED_MOTION_QUERY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReducedMotion(mql.matches);
     const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
     mql.addEventListener("change", handler);
@@ -152,6 +153,7 @@ export function HeistTransmission({
   // Reduced-motion fast path: reveal the entire transmission + payload at once.
   useEffect(() => {
     if (reducedMotion && !transmissionComplete) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRevealedCount(total);
     }
   }, [reducedMotion, total, transmissionComplete]);
