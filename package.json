@@ -20,6 +20,8 @@
     "postinstall": "prisma generate",
     "worker": "tsx --env-file=.env scripts/start-worker.ts",
     "worker:render": "tsx scripts/start-worker.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prepare": "husky"
   },
   "dependencies": {
@@ -94,9 +96,11 @@
     "husky": "^9.1.7",
     "postcss": "^8",
     "prisma": "^7.8.0",
+    "prettier": "^3.3.3",
     "tailwindcss": "^4.3.2",
     "tsx": "^4.23.1",
     "typescript": "^6",
     "vitest": "^4.1.10"
   }
+
 }
