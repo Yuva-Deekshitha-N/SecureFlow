@@ -1,11 +1,11 @@
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma
 RUN npm ci --legacy-peer-deps
 
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
@@ -20,11 +20,11 @@ RUN npx prisma generate && npx next build
 # that ships inside .next/standalone). Kept separate from the app's own node_modules so the
 # app's runtime dependency tree stays exactly what Next's output tracing produced, and so this
 # layer is cached independently of app source changes.
-FROM node:20-alpine AS prisma-cli
+FROM node:22-alpine AS prisma-cli
 WORKDIR /opt/prisma-cli
 RUN npm init -y && npm install --omit=dev --ignore-scripts --no-audit --no-fund dotenv@16.6.1 prisma@7.8.0
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=9002
