@@ -14,6 +14,22 @@ type SearchParams = Promise<{
   findingsCount?: string;
 }>;
 
+const TIER_QUOTES: Record<string, string> = {
+  S: 'Ghost protocol. Zero traces left behind.',
+  A: 'The vault is empty. Clean getaway.',
+  B: 'Job done. A few loose ends remain.',
+  C: 'Amateur hour. The vault noticed.',
+  D: 'Blown cover. Back to the drawing board.',
+};
+
+function getRankFromScore(score: number): string {
+  if (score >= 90) return 'S';
+  if (score >= 75) return 'A';
+  if (score >= 60) return 'B';
+  if (score >= 40) return 'C';
+  return 'D';
+}
+
 export async function generateMetadata({
   searchParams,
 }: {
