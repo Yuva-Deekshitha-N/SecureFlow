@@ -4,32 +4,29 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const states: Map<number, unknown> = new Map();
 let idx = 0;
 
-vi.mock('react', () => {
-  const React = {
-    useState: (initial: unknown) => {
-      const id = idx++;
-      if (!states.has(id)) states.set(id, initial);
-      const setter = (v: unknown) => {
-        const next =
-          typeof v === 'function'
-            ? (v as (prev: unknown) => unknown)(states.get(id))
-            : v;
-        states.set(id, next);
-      };
-      return [states.get(id), setter];
-    },
-    useCallback: (fn: unknown) => fn,
-    useRef: (initial: unknown) => ({ current: initial }),
-    useEffect: (fn: () => void | (() => void)) => {
-      // Execute cleanup immediately for tests
-      const cleanup = fn();
-      if (typeof cleanup === 'function') {
-        cleanup();
-      }
-    },
-  };
-  return React;
-});
+vi.mock('react', () => ({
+  useState: (initial: unknown) => {
+    const id = idx++;
+    if (!states.has(id)) states.set(id, initial);
+    const setter = (v: unknown) => {
+      const next =
+        typeof v === 'function'
+          ? (v as (prev: unknown) => unknown)(states.get(id))
+          : v;
+      states.set(id, next);
+    };
+    return [states.get(id), setter];
+  },
+  useCallback: (fn: unknown) => fn,
+  useRef: (initial: unknown) => ({ current: initial }),
+  useEffect: (fn: () => void | (() => void)) => {
+    // Execute cleanup immediately for tests
+    const cleanup = fn();
+    if (typeof cleanup === 'function') {
+      cleanup();
+    }
+  },
+}));
 
 // Mock useToast to avoid complex dependencies
 vi.mock('@/hooks/use-toast', () => ({
