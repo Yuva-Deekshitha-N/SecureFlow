@@ -11,6 +11,16 @@ export async function getQueueMetrics() {
     throw new Error("Unauthorized");
   }
 
+  if (process.env.NEXT_PUBLIC_MOCK_DB === 'true') {
+    return {
+      waiting: 2,
+      active: 1,
+      completed: 15,
+      failed: 0,
+      delayed: 0,
+    };
+  }
+
   const counts = await webhookQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed');
   return counts;
 }
