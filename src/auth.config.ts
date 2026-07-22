@@ -74,7 +74,12 @@ export default {
       }
     },
     async session({ session, token }: any) {
-      // ⭐ NEW: Add null check for session.user
+      // ⭐ Ensure session exists
+      if (!session) {
+        return session;
+      }
+      
+      // ⭐ Check both session.user AND token before destructuring
       if (session?.user && token) {
         session.user.id = token.userId || "";
         (session.user as any).codename = token.codename || "";
